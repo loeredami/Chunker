@@ -39,19 +39,20 @@ func (m *Memory) MaxSize() int {
 	return m.maxSize
 }
 
-func (m *Memory) CanAllocate(size MemSize) bool {
+func (m *Memory) CanAllocate(size int) bool {
 	m.rwlock.Lock()
 	defer m.rwlock.Unlock()
 
-	if size > MemSize(m.maxSize)*MemSize(m.chunkSize) {
+	memSize := MemSize(size)
+	if memSize > MemSize(m.maxSize)*MemSize(m.chunkSize) {
 		return false
 	}
 	headerOffset := MemSize(unsafe.Sizeof(AllocationHeader{}))
-	if size <= headerOffset {
+	if memSize <= headerOffset {
 		return false
 	}
 
-	chunksNeeded := (int(size) + m.chunkSize - 1) / m.chunkSize
+	chunksNeeded := (size + m.chunkSize - 1) / m.chunkSize
 
 	for chunk := 0; chunk <= m.maxSize-chunksNeeded; chunk++ {
 		addr := MemAddr(chunk * m.chunkSize)
@@ -206,7 +207,7 @@ func (m *Memory) Allocate(size MemSize) ungo.Exception[MemoryPointer] {
 	return ungo.NewException(MemoryPointer{}, fmt.Errorf("no space available"))
 }
 
-func (m *Memory) Free(addr MemAddr) ungo.Exception[MemAddr] {
+func (m *Memory) Free(addr MemAddr) ungo.Exception[MemoryPointer] {
 	m.rwlock.Lock()
 	defer func() {
 		m.cleanTrailingFreeChunks()
@@ -215,15 +216,16 @@ func (m *Memory) Free(addr MemAddr) ungo.Exception[MemAddr] {
 	headerO := m.checkForAndReadAllocationHeader(addr)
 	if headerO.HasValue() {
 		if headerO.Value().locked {
-			return ungo.NewException(addr, fmt.Errorf("cannot free locked allocation"))
+			return ungo.NewException(MemoryPointer{}, fmt.Errorf("cannot free locked allocation"))
 		}
 
-		m.zeroOutWithHeader(headerO.Value(), addr)
+		header := headerO.Value()
+		m.zeroOutWithHeader(header, addr)
 		m.writeAllocationHeader(addr, 0, false)
+		return ungo.NewException(MemoryPointer{addr: addr, allocHeader: header}, nil)
 	} else {
-		return ungo.NewException(addr, fmt.Errorf("no allocation found at address"))
+		return ungo.NewException(MemoryPointer{}, fmt.Errorf("no allocation found at address"))
 	}
-	return ungo.NewException(addr, nil)
 }
 
 func (m *Memory) Lock(addr MemAddr) ungo.Exception[MemAddr] {
