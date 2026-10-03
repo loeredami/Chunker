@@ -216,7 +216,7 @@ func (s *SwapMemory) Allocate(size MemSize) ungo.Exception[MemoryPointer] {
 	return ungo.NewException(MemoryPointer{}, fmt.Errorf("no space available"))
 }
 
-func (s *SwapMemory) Free(addr MemAddr) ungo.Exception[MemAddr] {
+func (s *SwapMemory) Free(addr MemAddr) ungo.Exception[MemoryPointer] {
 	s.rwlock.Lock()
 	defer func() {
 		s.cleanTrailingFreeChunks()
@@ -225,15 +225,15 @@ func (s *SwapMemory) Free(addr MemAddr) ungo.Exception[MemAddr] {
 	headerO := s.checkForAndReadAllocationHeader(addr)
 	if headerO.HasValue() {
 		if headerO.Value().locked {
-			return ungo.NewException(addr, fmt.Errorf("cannot free locked allocation"))
+			return ungo.NewException(MemoryPointer{addr: addr, allocHeader: headerO.Value()}, fmt.Errorf("cannot free locked allocation"))
 		}
 
 		s.zeroOutWithHeader(headerO.Value(), addr)
 		s.writeAllocationHeader(addr, 0, false)
 	} else {
-		return ungo.NewException(addr, fmt.Errorf("no allocation found at address"))
+		return ungo.NewException(MemoryPointer{addr: addr}, fmt.Errorf("no allocation found at address"))
 	}
-	return ungo.NewException(addr, nil)
+	return ungo.NewException(MemoryPointer{addr: addr, allocHeader: headerO.Value()}, nil)
 }
 
 func (s *SwapMemory) Lock(addr MemAddr) ungo.Exception[MemAddr] {
