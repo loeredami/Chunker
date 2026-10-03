@@ -11,11 +11,11 @@ const (
 )
 
 type AllocationHeader struct {
-	locked bool
-	size   MemSize
+	Locked bool
+	Size   MemSize
 }
 
 type MemoryPointer struct {
-	addr        MemAddr
-	allocHeader AllocationHeader
+	Addr        MemAddr
+	AllocHeader AllocationHeader
 }

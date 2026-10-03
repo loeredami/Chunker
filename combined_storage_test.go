@@ -31,8 +31,8 @@ func TestCombinedStorageAllocationAndLifecycle(t *testing.T) {
 	}
 
 	// Verify that the second allocation address is offset by mem1's size (64 bytes)
-	if ptr2E.Value.addr < 64 {
-		t.Errorf("Expected second allocation address to be offset past 64, got %d", ptr2E.Value.addr)
+	if ptr2E.Value.Addr < 64 {
+		t.Errorf("Expected second allocation address to be offset past 64, got %d", ptr2E.Value.Addr)
 	}
 
 	// Test writing and reading across combined storage
@@ -45,7 +45,7 @@ func TestCombinedStorageAllocationAndLifecycle(t *testing.T) {
 	}
 
 	// Test freeing
-	freeE := combined.Free(ptr2E.Value.addr)
+	freeE := combined.Free(ptr2E.Value.Addr)
 	if freeE.Error != nil {
 		t.Fatalf("Failed to free in combined storage: %v", freeE.Error)
 	}

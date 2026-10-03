@@ -63,8 +63,8 @@ func (s *SwapMemory) CanAllocate(size int) bool {
 		addr := MemAddr(chunk * s.chunkSize)
 		headerO := s.checkForAndReadAllocationHeader(addr)
 
-		if headerO.HasValue() && headerO.Value().size > 0 {
-			usedChunks := (int(headerO.Value().size) + s.chunkSize - 1) / s.chunkSize
+		if headerO.HasValue() && headerO.Value().Size > 0 {
+			usedChunks := (int(headerO.Value().Size) + s.chunkSize - 1) / s.chunkSize
 			if usedChunks < 1 {
 				usedChunks = 1
 			}
@@ -76,7 +76,7 @@ func (s *SwapMemory) CanAllocate(size int) bool {
 		for c := 0; c < chunksNeeded; c++ {
 			checkAddr := MemAddr((chunk + c) * s.chunkSize)
 			chkO := s.checkForAndReadAllocationHeader(checkAddr)
-			if chkO.HasValue() && chkO.Value().size > 0 {
+			if chkO.HasValue() && chkO.Value().Size > 0 {
 				freeChunks = false
 				break
 			}
@@ -97,10 +97,10 @@ func (s *SwapMemory) GetUsedSize() int {
 		headerO := s.checkForAndReadAllocationHeader(MemAddr(chunk * s.chunkSize))
 		if headerO.HasValue() {
 			header := headerO.Value()
-			if header.size == 0 {
+			if header.Size == 0 {
 				continue
 			}
-			usedSize += int(header.size) + headerSize
+			usedSize += int(header.Size) + headerSize
 		}
 	}
 	return usedSize
@@ -139,8 +139,8 @@ func (s *SwapMemory) checkForAndReadAllocationHeader(addr MemAddr) ungo.Optional
 }
 
 func (s *SwapMemory) zeroOutWithHeader(header AllocationHeader, addr MemAddr) ungo.Optional[error] {
-	if !header.locked {
-		zeroBytes := make([]byte, header.size)
+	if !header.Locked {
+		zeroBytes := make([]byte, header.Size)
 		_, err := s.file.WriteAt(zeroBytes, int64(addr))
 		if err != nil {
 			return ungo.Some(err)
@@ -151,7 +151,7 @@ func (s *SwapMemory) zeroOutWithHeader(header AllocationHeader, addr MemAddr) un
 }
 
 func (s *SwapMemory) writeAllocationHeader(addr MemAddr, size MemSize, locked bool) {
-	header := AllocationHeader{locked: locked, size: size}
+	header := AllocationHeader{Locked: locked, Size: size}
 	headerSize := int(unsafe.Sizeof(AllocationHeader{}))
 
 	if int64(addr)+int64(headerSize) <= s.fileSize {
@@ -186,26 +186,26 @@ func (s *SwapMemory) Allocate(size MemSize) ungo.Exception[MemoryPointer] {
 	for addr := MemAddr(0); int64(addr)+int64(chunksNeeded*s.chunkSize) <= s.fileSize; addr += MemAddr(s.chunkSize) {
 		headerO := s.checkForAndReadAllocationHeader(addr)
 
-		if !headerO.HasValue() || headerO.Value().size == 0 {
+		if !headerO.HasValue() || headerO.Value().Size == 0 {
 			freeChunks := true
 			for c := 0; c < chunksNeeded; c++ {
 				checkAddr := addr + MemAddr(c*s.chunkSize)
 				chkO := s.checkForAndReadAllocationHeader(checkAddr)
-				if chkO.HasValue() && chkO.Value().size != 0 {
+				if chkO.HasValue() && chkO.Value().Size != 0 {
 					freeChunks = false
 					break
 				}
 			}
 
 			if freeChunks {
-				newHeader := AllocationHeader{locked: false, size: size}
+				newHeader := AllocationHeader{Locked: false, Size: size}
 				s.zeroOutWithHeader(newHeader, addr)
 				s.writeAllocationHeader(addr, size, false)
-				return ungo.NewException(MemoryPointer{addr: addr, allocHeader: newHeader}, nil)
+				return ungo.NewException(MemoryPointer{Addr: addr, AllocHeader: newHeader}, nil)
 			}
 		} else {
 			h := headerO.Value()
-			usedChunks := (int(h.size) + s.chunkSize - 1) / s.chunkSize
+			usedChunks := (int(h.Size) + s.chunkSize - 1) / s.chunkSize
 			if usedChunks < 1 {
 				usedChunks = 1
 			}
@@ -224,16 +224,16 @@ func (s *SwapMemory) Free(addr MemAddr) ungo.Exception[MemoryPointer] {
 	}()
 	headerO := s.checkForAndReadAllocationHeader(addr)
 	if headerO.HasValue() {
-		if headerO.Value().locked {
-			return ungo.NewException(MemoryPointer{addr: addr, allocHeader: headerO.Value()}, fmt.Errorf("cannot free locked allocation"))
+		if headerO.Value().Locked {
+			return ungo.NewException(MemoryPointer{Addr: addr, AllocHeader: headerO.Value()}, fmt.Errorf("cannot free locked allocation"))
 		}
 
 		s.zeroOutWithHeader(headerO.Value(), addr)
 		s.writeAllocationHeader(addr, 0, false)
 	} else {
-		return ungo.NewException(MemoryPointer{addr: addr}, fmt.Errorf("no allocation found at address"))
+		return ungo.NewException(MemoryPointer{Addr: addr}, fmt.Errorf("no allocation found at address"))
 	}
-	return ungo.NewException(MemoryPointer{addr: addr, allocHeader: headerO.Value()}, nil)
+	return ungo.NewException(MemoryPointer{Addr: addr, AllocHeader: headerO.Value()}, nil)
 }
 
 func (s *SwapMemory) Lock(addr MemAddr) ungo.Exception[MemAddr] {
@@ -244,8 +244,8 @@ func (s *SwapMemory) Lock(addr MemAddr) ungo.Exception[MemAddr] {
 		return ungo.NewException(addr, fmt.Errorf("no allocation found at address"))
 	}
 	header := headerO.Value()
-	header.locked = true
-	s.writeAllocationHeader(addr, header.size, header.locked)
+	header.Locked = true
+	s.writeAllocationHeader(addr, header.Size, header.Locked)
 	return ungo.NewException(addr, nil)
 }
 
@@ -257,26 +257,26 @@ func (s *SwapMemory) Unlock(addr MemAddr) ungo.Exception[MemAddr] {
 		return ungo.NewException(addr, fmt.Errorf("no allocation found at address"))
 	}
 	header := headerO.Value()
-	header.locked = false
-	s.writeAllocationHeader(addr, header.size, header.locked)
+	header.Locked = false
+	s.writeAllocationHeader(addr, header.Size, header.Locked)
 	return ungo.NewException(addr, nil)
 }
 
 func (s *SwapMemory) ReadFull(ptr MemoryPointer) []byte {
 	s.rwlock.Lock()
 	defer s.rwlock.Unlock()
-	if ptr.allocHeader == (AllocationHeader{}) || ptr.allocHeader.size == 0 {
+	if ptr.AllocHeader == (AllocationHeader{}) || ptr.AllocHeader.Size == 0 {
 		return nil
 	}
 
 	headerOffset := int(unsafe.Sizeof(AllocationHeader{}))
-	payloadSize := int(ptr.allocHeader.size) - headerOffset
+	payloadSize := int(ptr.AllocHeader.Size) - headerOffset
 	if payloadSize <= 0 {
 		return nil
 	}
 
 	buf := make([]byte, payloadSize)
-	_, err := s.file.ReadAt(buf, int64(ptr.addr)+int64(headerOffset))
+	_, err := s.file.ReadAt(buf, int64(ptr.Addr)+int64(headerOffset))
 	if err != nil {
 		return nil
 	}
@@ -286,12 +286,12 @@ func (s *SwapMemory) ReadFull(ptr MemoryPointer) []byte {
 func (s *SwapMemory) Read(ptr MemoryPointer, readSize int, offset int) []byte {
 	s.rwlock.Lock()
 	defer s.rwlock.Unlock()
-	if ptr.allocHeader.size == 0 {
+	if ptr.AllocHeader.Size == 0 {
 		return nil
 	}
 
 	headerOffset := int(unsafe.Sizeof(AllocationHeader{}))
-	payloadSize := int(ptr.allocHeader.size) - headerOffset
+	payloadSize := int(ptr.AllocHeader.Size) - headerOffset
 	if offset < 0 || offset >= payloadSize {
 		return nil
 	}
@@ -305,7 +305,7 @@ func (s *SwapMemory) Read(ptr MemoryPointer, readSize int, offset int) []byte {
 	}
 
 	buf := make([]byte, actualReadSize)
-	_, err := s.file.ReadAt(buf, int64(ptr.addr)+int64(headerOffset)+int64(offset))
+	_, err := s.file.ReadAt(buf, int64(ptr.Addr)+int64(headerOffset)+int64(offset))
 	if err != nil {
 		return nil
 	}
@@ -315,12 +315,12 @@ func (s *SwapMemory) Read(ptr MemoryPointer, readSize int, offset int) []byte {
 func (s *SwapMemory) Write(ptr MemoryPointer, data []byte, offset int) {
 	s.rwlock.Lock()
 	defer s.rwlock.Unlock()
-	if ptr.allocHeader.size == 0 {
+	if ptr.AllocHeader.Size == 0 {
 		return
 	}
 
 	headerOffset := int(unsafe.Sizeof(AllocationHeader{}))
-	payloadSize := int(ptr.allocHeader.size) - headerOffset
+	payloadSize := int(ptr.AllocHeader.Size) - headerOffset
 	if offset < 0 || offset >= payloadSize {
 		return
 	}
@@ -333,14 +333,14 @@ func (s *SwapMemory) Write(ptr MemoryPointer, data []byte, offset int) {
 		return
 	}
 
-	s.file.WriteAt(data[:actualWriteSize], int64(ptr.addr)+int64(headerOffset)+int64(offset))
+	s.file.WriteAt(data[:actualWriteSize], int64(ptr.Addr)+int64(headerOffset)+int64(offset))
 }
 
 func (s *SwapMemory) cleanTrailingFreeChunks() {
 	for s.fileSize >= int64(s.chunkSize) {
 		addr := MemAddr(s.fileSize - int64(s.chunkSize))
 		headerO := s.checkForAndReadAllocationHeader(addr)
-		if headerO.HasValue() && headerO.Value().size > 0 {
+		if headerO.HasValue() && headerO.Value().Size > 0 {
 			break
 		}
 		s.fileSize -= int64(s.chunkSize)
@@ -368,10 +368,10 @@ func (s *SwapMemory) Pointer(addr MemAddr) ungo.Exception[MemoryPointer] {
 	startChunkAddr := MemAddr((int(addr) / s.chunkSize) * s.chunkSize)
 	for a := startChunkAddr; int(a) >= 0; a -= MemAddr(s.chunkSize) {
 		headerO := s.checkForAndReadAllocationHeader(a)
-		if headerO.HasValue() && headerO.Value().size > 0 {
+		if headerO.HasValue() && headerO.Value().Size > 0 {
 			header := headerO.Value()
-			if int(addr) >= int(a) && int(addr) < int(a)+int(header.size) {
-				return ungo.NewException(MemoryPointer{addr: a, allocHeader: header}, nil)
+			if int(addr) >= int(a) && int(addr) < int(a)+int(header.Size) {
+				return ungo.NewException(MemoryPointer{Addr: a, AllocHeader: header}, nil)
 			}
 		}
 	}

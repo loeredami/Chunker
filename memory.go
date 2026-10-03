@@ -58,8 +58,8 @@ func (m *Memory) CanAllocate(size int) bool {
 		addr := MemAddr(chunk * m.chunkSize)
 		headerO := m.checkForAndReadAllocationHeader(addr)
 
-		if headerO.HasValue() && headerO.Value().size > 0 {
-			usedChunks := (int(headerO.Value().size) + m.chunkSize - 1) / m.chunkSize
+		if headerO.HasValue() && headerO.Value().Size > 0 {
+			usedChunks := (int(headerO.Value().Size) + m.chunkSize - 1) / m.chunkSize
 			if usedChunks < 1 {
 				usedChunks = 1
 			}
@@ -71,7 +71,7 @@ func (m *Memory) CanAllocate(size int) bool {
 		for c := 0; c < chunksNeeded; c++ {
 			checkAddr := MemAddr((chunk + c) * m.chunkSize)
 			chkO := m.checkForAndReadAllocationHeader(checkAddr)
-			if chkO.HasValue() && chkO.Value().size > 0 {
+			if chkO.HasValue() && chkO.Value().Size > 0 {
 				freeChunks = false
 				break
 			}
@@ -92,10 +92,10 @@ func (m *Memory) GetUsedSize() int {
 		headerO := m.checkForAndReadAllocationHeader(MemAddr(chunk * m.chunkSize))
 		if headerO.HasValue() {
 			header := headerO.Value()
-			if header.size == 0 {
+			if header.Size == 0 {
 				continue
 			}
-			usedSize += int(header.size) + headerSize
+			usedSize += int(header.Size) + headerSize
 		}
 	}
 	return usedSize
@@ -130,8 +130,8 @@ func (m *Memory) checkForAndReadAllocationHeader(addr MemAddr) ungo.Optional[All
 }
 
 func (m *Memory) zeroOutWithHeader(header AllocationHeader, addr MemAddr) ungo.Optional[error] {
-	if !header.locked {
-		for i := 0; i < int(header.size); i++ {
+	if !header.Locked {
+		for i := 0; i < int(header.Size); i++ {
 			if int(addr)+i < len(m.buffer) {
 				m.buffer[int(addr)+i] = 0
 			}
@@ -142,7 +142,7 @@ func (m *Memory) zeroOutWithHeader(header AllocationHeader, addr MemAddr) ungo.O
 }
 
 func (m *Memory) writeAllocationHeader(addr MemAddr, size MemSize, locked bool) {
-	header := AllocationHeader{locked: locked, size: size}
+	header := AllocationHeader{Locked: locked, Size: size}
 	headerSize := int(unsafe.Sizeof(AllocationHeader{}))
 
 	if int(addr)+headerSize <= len(m.buffer) {
@@ -177,26 +177,26 @@ func (m *Memory) Allocate(size MemSize) ungo.Exception[MemoryPointer] {
 	for addr := MemAddr(0); int(addr)+chunksNeeded*m.chunkSize <= len(m.buffer); addr += MemAddr(m.chunkSize) {
 		headerO := m.checkForAndReadAllocationHeader(addr)
 
-		if !headerO.HasValue() || headerO.Value().size == 0 {
+		if !headerO.HasValue() || headerO.Value().Size == 0 {
 			freeChunks := true
 			for c := 0; c < chunksNeeded; c++ {
 				checkAddr := addr + MemAddr(c*m.chunkSize)
 				chkO := m.checkForAndReadAllocationHeader(checkAddr)
-				if chkO.HasValue() && chkO.Value().size != 0 {
+				if chkO.HasValue() && chkO.Value().Size != 0 {
 					freeChunks = false
 					break
 				}
 			}
 
 			if freeChunks {
-				newHeader := AllocationHeader{locked: false, size: size}
+				newHeader := AllocationHeader{Locked: false, Size: size}
 				m.zeroOutWithHeader(newHeader, addr)
 				m.writeAllocationHeader(addr, size, false)
-				return ungo.NewException(MemoryPointer{addr: addr, allocHeader: newHeader}, nil)
+				return ungo.NewException(MemoryPointer{Addr: addr, AllocHeader: newHeader}, nil)
 			}
 		} else {
 			h := headerO.Value()
-			usedChunks := (int(h.size) + m.chunkSize - 1) / m.chunkSize
+			usedChunks := (int(h.Size) + m.chunkSize - 1) / m.chunkSize
 			if usedChunks < 1 {
 				usedChunks = 1
 			}
@@ -215,14 +215,14 @@ func (m *Memory) Free(addr MemAddr) ungo.Exception[MemoryPointer] {
 	}()
 	headerO := m.checkForAndReadAllocationHeader(addr)
 	if headerO.HasValue() {
-		if headerO.Value().locked {
+		if headerO.Value().Locked {
 			return ungo.NewException(MemoryPointer{}, fmt.Errorf("cannot free locked allocation"))
 		}
 
 		header := headerO.Value()
 		m.zeroOutWithHeader(header, addr)
 		m.writeAllocationHeader(addr, 0, false)
-		return ungo.NewException(MemoryPointer{addr: addr, allocHeader: header}, nil)
+		return ungo.NewException(MemoryPointer{Addr: addr, AllocHeader: header}, nil)
 	} else {
 		return ungo.NewException(MemoryPointer{}, fmt.Errorf("no allocation found at address"))
 	}
@@ -236,8 +236,8 @@ func (m *Memory) Lock(addr MemAddr) ungo.Exception[MemAddr] {
 		return ungo.NewException(addr, fmt.Errorf("no allocation found at address"))
 	}
 	header := headerO.Value()
-	header.locked = true
-	m.writeAllocationHeader(addr, header.size, header.locked)
+	header.Locked = true
+	m.writeAllocationHeader(addr, header.Size, header.Locked)
 	return ungo.NewException(addr, nil)
 }
 
@@ -249,22 +249,22 @@ func (m *Memory) Unlock(addr MemAddr) ungo.Exception[MemAddr] {
 		return ungo.NewException(addr, fmt.Errorf("no allocation found at address"))
 	}
 	header := headerO.Value()
-	header.locked = false
-	m.writeAllocationHeader(addr, header.size, header.locked)
+	header.Locked = false
+	m.writeAllocationHeader(addr, header.Size, header.Locked)
 	return ungo.NewException(addr, nil)
 }
 
 func (m *Memory) ReadFull(ptr MemoryPointer) []byte {
 	m.rwlock.Lock()
 	defer m.rwlock.Unlock()
-	if ptr.allocHeader == (AllocationHeader{}) || ptr.allocHeader.size == 0 {
+	if ptr.AllocHeader == (AllocationHeader{}) || ptr.AllocHeader.Size == 0 {
 		return nil
 	}
 
 	headerOffset := int(unsafe.Sizeof(AllocationHeader{}))
 	var resultBuffer bytes.Buffer
-	for i := headerOffset; i < int(ptr.allocHeader.size); i++ {
-		idx := int(ptr.addr) + i
+	for i := headerOffset; i < int(ptr.AllocHeader.Size); i++ {
+		idx := int(ptr.Addr) + i
 		if idx < len(m.buffer) {
 			resultBuffer.WriteByte(m.buffer[idx])
 		}
@@ -275,12 +275,12 @@ func (m *Memory) ReadFull(ptr MemoryPointer) []byte {
 func (m *Memory) Read(ptr MemoryPointer, readSize int, offset int) []byte {
 	m.rwlock.Lock()
 	defer m.rwlock.Unlock()
-	if ptr.allocHeader.size == 0 {
+	if ptr.AllocHeader.Size == 0 {
 		return nil
 	}
 
 	headerOffset := int(unsafe.Sizeof(AllocationHeader{}))
-	payloadSize := int(ptr.allocHeader.size) - headerOffset
+	payloadSize := int(ptr.AllocHeader.Size) - headerOffset
 	if offset < 0 || offset >= payloadSize {
 		return nil
 	}
@@ -290,7 +290,7 @@ func (m *Memory) Read(ptr MemoryPointer, readSize int, offset int) []byte {
 		if offset+i >= payloadSize {
 			break
 		}
-		idx := int(ptr.addr) + headerOffset + offset + i
+		idx := int(ptr.Addr) + headerOffset + offset + i
 		if idx < len(m.buffer) {
 			resultBuffer.WriteByte(m.buffer[idx])
 		}
@@ -301,12 +301,12 @@ func (m *Memory) Read(ptr MemoryPointer, readSize int, offset int) []byte {
 func (m *Memory) Write(ptr MemoryPointer, data []byte, offset int) {
 	m.rwlock.Lock()
 	defer m.rwlock.Unlock()
-	if ptr.allocHeader.size == 0 {
+	if ptr.AllocHeader.Size == 0 {
 		return
 	}
 
 	headerOffset := int(unsafe.Sizeof(AllocationHeader{}))
-	payloadSize := int(ptr.allocHeader.size) - headerOffset
+	payloadSize := int(ptr.AllocHeader.Size) - headerOffset
 	if offset < 0 || offset >= payloadSize {
 		return
 	}
@@ -315,7 +315,7 @@ func (m *Memory) Write(ptr MemoryPointer, data []byte, offset int) {
 		if offset+i >= payloadSize {
 			break
 		}
-		idx := int(ptr.addr) + headerOffset + offset + i
+		idx := int(ptr.Addr) + headerOffset + offset + i
 		if idx < len(m.buffer) {
 			m.buffer[idx] = b
 		}
@@ -326,7 +326,7 @@ func (m *Memory) cleanTrailingFreeChunks() {
 	for len(m.buffer) >= m.chunkSize {
 		addr := MemAddr(len(m.buffer) - m.chunkSize)
 		headerO := m.checkForAndReadAllocationHeader(addr)
-		if headerO.HasValue() && headerO.Value().size > 0 {
+		if headerO.HasValue() && headerO.Value().Size > 0 {
 			break
 		}
 		m.buffer = m.buffer[:len(m.buffer)-m.chunkSize]
@@ -348,10 +348,10 @@ func (m *Memory) Pointer(addr MemAddr) ungo.Exception[MemoryPointer] {
 	startChunkAddr := MemAddr((int(addr) / m.chunkSize) * m.chunkSize)
 	for a := startChunkAddr; int(a) >= 0; a -= MemAddr(m.chunkSize) {
 		headerO := m.checkForAndReadAllocationHeader(a)
-		if headerO.HasValue() && headerO.Value().size > 0 {
+		if headerO.HasValue() && headerO.Value().Size > 0 {
 			header := headerO.Value()
-			if int(addr) >= int(a) && int(addr) < int(a)+int(header.size) {
-				return ungo.NewException(MemoryPointer{addr: a, allocHeader: header}, nil)
+			if int(addr) >= int(a) && int(addr) < int(a)+int(header.Size) {
+				return ungo.NewException(MemoryPointer{Addr: a, AllocHeader: header}, nil)
 			}
 		}
 	}

@@ -18,10 +18,10 @@ func TestMemoryAllocationAndLifecycle(t *testing.T) {
 	}
 
 	ptr := ptrE.Value
-	if ptr.allocHeader.size != allocSize {
-		t.Errorf("Expected size %d, got %d", allocSize, ptr.allocHeader.size)
+	if ptr.AllocHeader.Size != allocSize {
+		t.Errorf("Expected size %d, got %d", allocSize, ptr.AllocHeader.Size)
 	}
-	if ptr.allocHeader.locked {
+	if ptr.AllocHeader.Locked {
 		t.Errorf("Expected new allocation to be unlocked")
 	}
 
@@ -42,22 +42,22 @@ func TestMemoryAllocationAndLifecycle(t *testing.T) {
 		}
 	}
 
-	lockE := mem.Lock(ptr.addr)
+	lockE := mem.Lock(ptr.Addr)
 	if lockE.Error != nil {
 		t.Fatalf("Failed to lock memory: %v", lockE.Error)
 	}
 
-	freeE := mem.Free(ptr.addr)
+	freeE := mem.Free(ptr.Addr)
 	if freeE.Error == nil {
 		t.Errorf("Expected error when freeing locked memory")
 	}
 
-	unlockE := mem.Unlock(ptr.addr)
+	unlockE := mem.Unlock(ptr.Addr)
 	if unlockE.Error != nil {
 		t.Fatalf("Failed to unlock memory: %v", unlockE.Error)
 	}
 
-	freeE = mem.Free(ptr.addr)
+	freeE = mem.Free(ptr.Addr)
 	if freeE.Error != nil {
 		t.Fatalf("Failed to free memory: %v", freeE.Error)
 	}
@@ -66,8 +66,8 @@ func TestMemoryAllocationAndLifecycle(t *testing.T) {
 	if ptrE2.Error != nil {
 		t.Fatalf("Failed to re-allocate: %v", ptrE2.Error)
 	}
-	if ptrE2.Value.addr != ptr.addr {
-		t.Errorf("Expected memory to be reused at addr %d, got %d", ptr.addr, ptrE2.Value.addr)
+	if ptrE2.Value.Addr != ptr.Addr {
+		t.Errorf("Expected memory to be reused at addr %d, got %d", ptr.Addr, ptrE2.Value.Addr)
 	}
 }
 
@@ -136,7 +136,7 @@ func TestTrailingDeallocationAndCleanup(t *testing.T) {
 	initialLen := len(mem.buffer)
 
 	// Freeing p3 (the trailing block) should trigger cleanTrailingFreeChunks and shrink the buffer
-	freeE := mem.Free(p3.Value.addr)
+	freeE := mem.Free(p3.Value.Addr)
 	if freeE.Error != nil {
 		t.Fatalf("Failed to free trailing block: %v", freeE.Error)
 	}

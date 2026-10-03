@@ -98,8 +98,8 @@ func (cs *CombinedStorage) Allocate(size MemSize) ungo.Exception[MemoryPointer] 
 			ptrE := s.Allocate(size)
 			if ptrE.Error == nil {
 				translatedPtr := MemoryPointer{
-					addr:        ptrE.Value.addr + offset,
-					allocHeader: ptrE.Value.allocHeader,
+					Addr:        ptrE.Value.Addr + offset,
+					AllocHeader: ptrE.Value.AllocHeader,
 				}
 				return ungo.NewException(translatedPtr, nil)
 			}
@@ -123,7 +123,7 @@ func (cs *CombinedStorage) Free(addr MemAddr) ungo.Exception[MemAddr] {
 	if resE.Error != nil {
 		return ungo.NewException(addr, resE.Error)
 	}
-	return ungo.NewException(resE.Value.addr+offset, nil)
+	return ungo.NewException(resE.Value.Addr+offset, nil)
 }
 
 func (cs *CombinedStorage) Lock(addr MemAddr) ungo.Exception[MemAddr] {
@@ -162,14 +162,14 @@ func (cs *CombinedStorage) ReadFull(ptr MemoryPointer) []byte {
 	cs.rwlock.Lock()
 	defer cs.rwlock.Unlock()
 
-	s, offset, errOpt := cs.findStorageAndOffset(ptr.addr)
+	s, offset, errOpt := cs.findStorageAndOffset(ptr.Addr)
 	if errOpt.HasValue() {
 		return nil
 	}
 
 	localPtr := MemoryPointer{
-		addr:        ptr.addr - offset,
-		allocHeader: ptr.allocHeader,
+		Addr:        ptr.Addr - offset,
+		AllocHeader: ptr.AllocHeader,
 	}
 	return s.ReadFull(localPtr)
 }
@@ -178,14 +178,14 @@ func (cs *CombinedStorage) Read(ptr MemoryPointer, readSize int, offset int) []b
 	cs.rwlock.Lock()
 	defer cs.rwlock.Unlock()
 
-	s, storageOffset, errOpt := cs.findStorageAndOffset(ptr.addr)
+	s, storageOffset, errOpt := cs.findStorageAndOffset(ptr.Addr)
 	if errOpt.HasValue() {
 		return nil
 	}
 
 	localPtr := MemoryPointer{
-		addr:        ptr.addr - storageOffset,
-		allocHeader: ptr.allocHeader,
+		Addr:        ptr.Addr - storageOffset,
+		AllocHeader: ptr.AllocHeader,
 	}
 	return s.Read(localPtr, readSize, offset)
 }
@@ -194,14 +194,14 @@ func (cs *CombinedStorage) Write(ptr MemoryPointer, data []byte, offset int) {
 	cs.rwlock.Lock()
 	defer cs.rwlock.Unlock()
 
-	s, storageOffset, errOpt := cs.findStorageAndOffset(ptr.addr)
+	s, storageOffset, errOpt := cs.findStorageAndOffset(ptr.Addr)
 	if errOpt.HasValue() {
 		return
 	}
 
 	localPtr := MemoryPointer{
-		addr:        ptr.addr - storageOffset,
-		allocHeader: ptr.allocHeader,
+		Addr:        ptr.Addr - storageOffset,
+		AllocHeader: ptr.AllocHeader,
 	}
 	s.Write(localPtr, data, offset)
 }
@@ -228,8 +228,8 @@ func (cs *CombinedStorage) Pointer(addr MemAddr) ungo.Exception[MemoryPointer] {
 	}
 
 	translatedPtr := MemoryPointer{
-		addr:        ptrE.Value.addr + offset,
-		allocHeader: ptrE.Value.allocHeader,
+		Addr:        ptrE.Value.Addr + offset,
+		AllocHeader: ptrE.Value.AllocHeader,
 	}
 	return ungo.NewException(translatedPtr, nil)
 }

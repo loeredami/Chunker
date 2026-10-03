@@ -32,8 +32,8 @@ func TestSwapMemoryAllocationAndLifecycle(t *testing.T) {
 	}
 
 	ptr := ptrE.Value
-	if ptr.allocHeader.size != allocSize {
-		t.Errorf("Expected size %d, got %d", allocSize, ptr.allocHeader.size)
+	if ptr.AllocHeader.Size != allocSize {
+		t.Errorf("Expected size %d, got %d", allocSize, ptr.AllocHeader.Size)
 	}
 
 	payloadSize := int(allocSize) - int(headerSize)
@@ -53,7 +53,7 @@ func TestSwapMemoryAllocationAndLifecycle(t *testing.T) {
 		}
 	}
 
-	freeE := mem.Free(ptr.addr)
+	freeE := mem.Free(ptr.Addr)
 	if freeE.Error != nil {
 		t.Fatalf("Failed to free memory: %v", freeE.Error)
 	}
@@ -101,7 +101,7 @@ func TestSwapTrailingDeallocationAndCleanup(t *testing.T) {
 
 	initialSize := mem.fileSize
 
-	freeE := mem.Free(p3.Value.addr)
+	freeE := mem.Free(p3.Value.Addr)
 	if freeE.Error != nil {
 		t.Fatalf("Failed to free trailing block: %v", freeE.Error)
 	}
