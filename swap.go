@@ -357,3 +357,24 @@ func (s *SwapMemory) Close() {
 		s.file = nil
 	}
 }
+func (s *SwapMemory) Pointer(addr MemAddr) ungo.Exception[MemoryPointer] {
+	s.rwlock.Lock()
+	defer s.rwlock.Unlock()
+
+	if int(addr) < 0 || int(addr) >= s.Size() {
+		return ungo.NewException(MemoryPointer{}, fmt.Errorf("address out of bounds"))
+	}
+
+	startChunkAddr := MemAddr((int(addr) / s.chunkSize) * s.chunkSize)
+	for a := startChunkAddr; int(a) >= 0; a -= MemAddr(s.chunkSize) {
+		headerO := s.checkForAndReadAllocationHeader(a)
+		if headerO.HasValue() && headerO.Value().size > 0 {
+			header := headerO.Value()
+			if int(addr) >= int(a) && int(addr) < int(a)+int(header.size) {
+				return ungo.NewException(MemoryPointer{addr: a, allocHeader: header}, nil)
+			}
+		}
+	}
+
+	return ungo.NewException(MemoryPointer{}, fmt.Errorf("no allocation found for address"))
+}

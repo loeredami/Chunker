@@ -15,5 +15,6 @@ type DataStorage interface {
 	ReadFull(ptr MemoryPointer) []byte
 	Read(ptr MemoryPointer, readSize int, offset int) []byte
 	Write(ptr MemoryPointer, data []byte, offset int)
+	Pointer(addr MemAddr) ungo.Exception[MemoryPointer]
 	Close()
 }

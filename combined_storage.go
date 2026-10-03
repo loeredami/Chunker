@@ -213,3 +213,23 @@ func (cs *CombinedStorage) Close() {
 		s.Close()
 	}
 }
+func (cs *CombinedStorage) Pointer(addr MemAddr) ungo.Exception[MemoryPointer] {
+	cs.rwlock.Lock()
+	defer cs.rwlock.Unlock()
+
+	s, offset, errOpt := cs.findStorageAndOffset(addr)
+	if errOpt.HasValue() {
+		return ungo.NewException(MemoryPointer{}, errOpt.Value())
+	}
+
+	ptrE := s.Pointer(addr - offset)
+	if ptrE.Error != nil {
+		return ungo.NewException(MemoryPointer{}, ptrE.Error)
+	}
+
+	translatedPtr := MemoryPointer{
+		addr:        ptrE.Value.addr + offset,
+		allocHeader: ptrE.Value.allocHeader,
+	}
+	return ungo.NewException(translatedPtr, nil)
+}

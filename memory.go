@@ -337,3 +337,24 @@ func (m *Memory) cleanTrailingFreeChunks() {
 func (m *Memory) Close() {
 	// this does nothing, but satisfies the DataStorage interface
 }
+func (m *Memory) Pointer(addr MemAddr) ungo.Exception[MemoryPointer] {
+	m.rwlock.Lock()
+	defer m.rwlock.Unlock()
+
+	if int(addr) < 0 || int(addr) >= m.Size() {
+		return ungo.NewException(MemoryPointer{}, fmt.Errorf("address out of bounds"))
+	}
+
+	startChunkAddr := MemAddr((int(addr) / m.chunkSize) * m.chunkSize)
+	for a := startChunkAddr; int(a) >= 0; a -= MemAddr(m.chunkSize) {
+		headerO := m.checkForAndReadAllocationHeader(a)
+		if headerO.HasValue() && headerO.Value().size > 0 {
+			header := headerO.Value()
+			if int(addr) >= int(a) && int(addr) < int(a)+int(header.size) {
+				return ungo.NewException(MemoryPointer{addr: a, allocHeader: header}, nil)
+			}
+		}
+	}
+
+	return ungo.NewException(MemoryPointer{}, fmt.Errorf("no allocation found for address"))
+}
