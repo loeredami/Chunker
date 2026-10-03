@@ -331,3 +331,7 @@ func (m *Memory) cleanTrailingFreeChunks() {
 		m.allocatedChunks = len(m.buffer) / m.chunkSize
 	}
 }
+
+func (m *Memory) Close() {
+	// this does nothing, but satisfies the DataStorage interface
+}
